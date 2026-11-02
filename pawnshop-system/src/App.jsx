@@ -6,6 +6,10 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Users from './pages/Users'
 import Dashboard from './pages/Dashboard'
+import CreateStaff from './pages/CreateStaff'
+import AppraiserDashboard from './pages/AppraiserDashboard'
+import NewAppraisal from './pages/NewAppraisal'
+
 
 function Placeholder({ title }) {
   return (
@@ -63,10 +67,10 @@ export default function App() {
           />
 
           <Route
-            path="/users"
+            path="/create-staff"
             element={
               <RolePage roles={['Administrator']}>
-                <Users />
+                <CreateStaff />
               </RolePage>
             }
           />
@@ -120,7 +124,16 @@ export default function App() {
             path="/appraisals"
             element={
               <RolePage roles={['Appraiser']}>
-                <Placeholder title="Appraisals" />
+                <AppraiserDashboard />
+              </RolePage>
+            }
+          />
+          
+          <Route
+            path="/new-appraisal"
+            element={
+              <RolePage roles={['Appraiser']}>
+                <NewAppraisal />
               </RolePage>
             }
           />

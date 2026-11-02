@@ -8,6 +8,7 @@ const navigation = {
     { label: 'Auctions', path: '/auctions' },
     { label: 'Reports', path: '/reports' },
     { label: 'Users', path: '/users' },
+    { label: 'Create Staff Account', path: '/create-staff' },
   ],
 
   Cashier: [

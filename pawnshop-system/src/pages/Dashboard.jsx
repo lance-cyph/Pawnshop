@@ -1,23 +1,547 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
-export default function Dashboard() {
-  const [customers, setCustomers] = useState([])
-  const [message, setMessage] = useState('Loading customers...')
+function peso(value) {
+  return '₱' + Number(value || 0).toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function getTodayRange() {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  }
+}
+
+function AdminDashboard({ user }) {
+  const [stats, setStats] = useState({
+    customers: 0,
+    activeLoans: 0,
+    activeLoanAmount: 0,
+    activeStaff: 0,
+    expiringLoans: 0,
+    expiredLoans: 0,
+    auctionItems: 0,
+    cashIn: 0,
+    cashOut: 0,
+  })
+
+  const [loanAlerts, setLoanAlerts] = useState({
+    expiring: [],
+    overdue: [],
+    auction: [],
+  })
+
+  // ADD THIS STATE
+  const [recentReceipts, setRecentReceipts] = useState([])
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const { start, end } = getTodayRange()
+
+      const [
+        customerResult,
+        ticketResult,
+        staffResult,
+        ledgerResult,
+        auctionResult,
+        receiptResult,
+      ] = await Promise.all([
+        supabase
+          .from('customers')
+          .select('customer_id', { count: 'exact', head: true }),
+
+        supabase
+          .from('pawn_tickets')
+          .select(`
+            ticket_id,
+            transaction_number,
+            loan_amount,
+            due_date,
+            grace_period_end_date,
+            ticket_status,
+            customers (
+              first_name,
+              last_name
+            ),
+            pawned_items (
+              item_status,
+              description
+            )
+          `),
+
+        supabase
+          .from('users')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('is_active', true),
+
+        supabase
+          .from('cash_flow_ledger')
+          .select('amount, flow_type')
+          .gte('transaction_date', start)
+          .lt('transaction_date', end),
+
+        supabase
+          .from('pawned_items')
+          .select('item_id', { count: 'exact', head: true })
+          .eq('item_status', 'For Auction'),
+
+        supabase
+          .from('receipts')
+          .select(`
+            receipt_id,
+            receipt_number,
+            transaction_type,
+            amount_paid,
+            issued_at,
+            pawn_tickets (
+              transaction_number,
+              customers (
+                first_name,
+                last_name
+              )
+            )
+          `)
+          .order('issued_at', { ascending: false })
+          .limit(5),
+      ])
+
+      const results = [
+        customerResult,
+        ticketResult,
+        staffResult,
+        ledgerResult,
+        auctionResult,
+        receiptResult,
+      ]
+
+      const failed = results.find((result) => result.error)
+
+      if (failed) {
+        throw new Error(failed.error.message)
+      }
+
+      const tickets = ticketResult.data || []
+      const ledger = ledgerResult.data || []
+
+      const activeTickets = tickets.filter((ticket) =>
+        ['Active', 'Renewed'].includes(ticket.ticket_status)
+      )
+
+      // Use YYYY-MM-DD strings to compare dates accurately.
+      const today = new Date()
+      const todayString = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+      ].join('-')
+
+      const sevenDaysLater = new Date(today)
+      sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
+
+      const sevenDaysString = [
+        sevenDaysLater.getFullYear(),
+        String(sevenDaysLater.getMonth() + 1).padStart(2, '0'),
+        String(sevenDaysLater.getDate()).padStart(2, '0'),
+      ].join('-')
+
+      // Due within the next 7 days, including today.
+      const expiringTickets = activeTickets.filter((ticket) =>
+        ticket.due_date >= todayString &&
+        ticket.due_date <= sevenDaysString
+      )
+
+      // Due date has passed, but the ticket is still active.
+      const overdueTickets = activeTickets.filter((ticket) =>
+        ticket.due_date < todayString &&
+        ticket.grace_period_end_date >= todayString
+      )
+      const gracePeriodExpiredTickets = activeTickets.filter((ticket) =>
+        ticket.grace_period_end_date &&
+        ticket.grace_period_end_date < todayString
+      )
+
+      // Pawned items already marked For Auction.
+      const auctionTickets = tickets.filter((ticket) =>
+        ticket.pawned_items?.item_status === 'For Auction'
+      )
+
+      setLoanAlerts({
+        expiring: expiringTickets,
+        overdue: overdueTickets,
+        auction: auctionTickets,
+      })
+      const cashIn = ledger
+        .filter((entry) => entry.flow_type === 'Inflow')
+        .reduce((total, entry) => total + Number(entry.amount || 0), 0)
+
+      const cashOut = ledger
+        .filter((entry) => entry.flow_type === 'Outflow')
+        .reduce((total, entry) => total + Number(entry.amount || 0), 0)
+
+      setStats({
+        customers: customerResult.count || 0,
+        activeLoans: activeTickets.length,
+        activeLoanAmount: activeTickets.reduce(
+          (total, ticket) => total + Number(ticket.loan_amount || 0),
+          0
+        ),
+        activeStaff: staffResult.count || 0,
+        expiringLoans: expiringTickets.length,
+        expiredLoans: overdueTickets.length,
+        auctionItems: auctionResult.count || 0,
+        cashIn,
+        cashOut,
+      })
+
+      setRecentReceipts(receiptResult.data || [])
+    } catch (err) {
+      setError(err.message || 'Unable to load dashboard information.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [loadDashboard])
+
+  const cards = [
+    {
+      title: 'Total Customers',
+      value: stats.customers.toLocaleString(),
+      icon: '👥',
+      color: '#ede9fe',
+    },
+    {
+      title: 'Active Loans',
+      value: stats.activeLoans.toLocaleString(),
+      subtitle: peso(stats.activeLoanAmount),
+      icon: '💰',
+      color: '#dbeafe',
+    },
+    {
+      title: 'Active Staff',
+      value: stats.activeStaff.toLocaleString(),
+      icon: '👨‍💼',
+      color: '#dcfce7',
+    },
+    {
+      title: 'For Auction',
+      value: stats.auctionItems.toLocaleString(),
+      icon: '🔨',
+      color: '#ffedd5',
+    },
+  ]
+
+  return (
+    <div className="admin-dashboard">
+      <div className="dashboard-heading">
+        <div>
+          <h1>Administrator Dashboard</h1>
+          <p>
+            Welcome back, {user?.full_name || user?.username}.
+            Here's your pawnshop overview.
+          </p>
+        </div>
+
+        <button
+          className="dashboard-refresh"
+          onClick={loadDashboard}
+          disabled={loading}
+        >
+          {loading ? 'Loading...' : '↻ Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="dashboard-error">
+          {error}
+        </div>
+      )}
+
+      <div className="dashboard-grid">
+        {cards.map((card) => (
+          <div className="dashboard-card" key={card.title}>
+            <div
+              className="dashboard-card-icon"
+              style={{ background: card.color }}
+            >
+              {card.icon}
+            </div>
+
+            <div>
+              <span>{card.title}</span>
+              <strong>
+                {loading ? '...' : card.value}
+              </strong>
+
+              {card.subtitle && (
+                <small>{card.subtitle}</small>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+    <div className="dashboard-section">
+        <div className="dashboard-section-heading">
+          <h2>Loan Alerts</h2>
+          <span>Pawn tickets that need attention</span>
+        </div>
+
+        <div className="dashboard-grid dashboard-alert-grid">
+
+          {/* EXPIRING SOON */}
+          <div className="dashboard-alert warning">
+            <span>Expiring Within 7 Days</span>
+            <strong>{loading ? '...' : loanAlerts.expiring.length}</strong>
+          </div>
+
+          {/* OVERDUE */}
+          <div className="dashboard-alert danger">
+            <span>Overdue Loans</span>
+            <strong>{loading ? '...' : loanAlerts.overdue.length}</strong>
+          </div>
+
+          {/* FOR AUCTION */}
+          <div className="dashboard-alert">
+            <span>Items For Auction</span>
+            <strong>{loading ? '...' : loanAlerts.auction.length}</strong>
+          </div>
+
+        </div>
+
+        {loading ? (
+          <p className="dashboard-message">Loading loan alerts...</p>
+        ) : (
+          <div className="loan-alert-details">
+
+            {/* EXPIRING TICKETS */}
+            <div className="loan-alert-group">
+              <h3>Expiring Soon</h3>
+
+              {loanAlerts.expiring.length === 0 ? (
+                <p>No tickets expiring within 7 days.</p>
+              ) : (
+                loanAlerts.expiring.map((ticket) => {
+                  const customer = ticket.customers
+
+                  return (
+                    <div className="loan-alert-item" key={ticket.ticket_id}>
+                      <div>
+                        <strong>{ticket.transaction_number}</strong>
+                        <span>
+                          {customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown Customer'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <strong>{peso(ticket.loan_amount)}</strong>
+                        <span>Due: {ticket.due_date}</span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* OVERDUE TICKETS */}
+            <div className="loan-alert-group">
+              <h3>Overdue Loans</h3>
+
+              {loanAlerts.overdue.length === 0 ? (
+                <p>No overdue active loans.</p>
+              ) : (
+                loanAlerts.overdue.map((ticket) => {
+                  const customer = ticket.customers
+
+                  return (
+                    <div className="loan-alert-item" key={ticket.ticket_id}>
+                      <div>
+                        <strong>{ticket.transaction_number}</strong>
+                        <span>
+                          {customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown Customer'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <strong>{peso(ticket.loan_amount)}</strong>
+                        <span>Due: {ticket.due_date}</span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* AUCTION TICKETS */}
+            <div className="loan-alert-group">
+              <h3>Items For Auction</h3>
+
+              {loanAlerts.auction.length === 0 ? (
+                <p>No items currently marked For Auction.</p>
+              ) : (
+                loanAlerts.auction.map((ticket) => {
+                  const customer = ticket.customers
+
+                  return (
+                    <div className="loan-alert-item" key={ticket.ticket_id}>
+                      <div>
+                        <strong>{ticket.transaction_number}</strong>
+                        <span>
+                          {customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown Customer'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <strong>{peso(ticket.loan_amount)}</strong>
+                        <span>
+                          {ticket.pawned_items?.description || 'Pawned item'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-section">
+        <div className="dashboard-section-heading">
+          <h2>Cash Flow Today</h2>
+          <span>Based on today's ledger records</span>
+        </div>
+
+        <div className="dashboard-grid">
+          <div className="dashboard-cash-card">
+            <span>Cash In</span>
+            <strong className="cash-in">
+              {loading ? '...' : peso(stats.cashIn)}
+            </strong>
+          </div>
+
+          <div className="dashboard-cash-card">
+            <span>Cash Out</span>
+            <strong className="cash-out">
+              {loading ? '...' : peso(stats.cashOut)}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-section dashboard-table-card">
+        <div className="dashboard-section-heading">
+          <div>
+            <h2>Recent Transactions</h2>
+            <span>Latest receipts recorded in the system</span>
+          </div>
+          <Link to="/reports">View Reports</Link>
+        </div>
+
+        {loading ? (
+          <p className="dashboard-message">Loading transactions...</p>
+        ) : recentReceipts.length === 0 ? (
+          <p className="dashboard-message">No transactions recorded yet.</p>
+        ) : (
+          <div className="dashboard-table-wrapper">
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Receipt Number</th>
+                  <th>Customer</th>
+                  <th>Transaction</th>
+                  <th>Amount Paid</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {recentReceipts.map((receipt) => {
+                  const customer = receipt.pawn_tickets?.customers
+
+                  return (
+                    <tr key={receipt.receipt_id}>
+                      <td>{receipt.receipt_number}</td>
+                      <td>
+                        {customer
+                          ? `${customer.first_name} ${customer.last_name}`
+                          : 'Unknown Customer'}
+                      </td>
+                      <td>{receipt.transaction_type}</td>
+                      <td>{peso(receipt.amount_paid)}</td>
+                      <td>
+                        {new Date(receipt.issued_at).toLocaleString('en-PH')}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-section">
+        <div className="dashboard-section-heading">
+          <h2>Quick Shortcuts</h2>
+        </div>
+
+        <div className="dashboard-shortcuts">
+          <Link to="/users">Manage Staff</Link>
+          <Link to="/auctions">Manage Auctions</Link>
+          <Link to="/reports">View Reports</Link>
+          <Link to="/create-staff">Create Staff Account</Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CashierDashboard({ user }) {
+  const [customerCount, setCustomerCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [recentReceipts, setRecentReceipts] = useState([])
 
   useEffect(() => {
     async function loadCustomers() {
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from('customers')
-        .select('*')
+        .select('customer_id', { count: 'exact', head: true })
 
       if (error) {
-        setMessage(`Unable to load customers: ${error.message}`)
+        setError(error.message)
       } else {
-        setCustomers(data || [])
-        setMessage('Connected to Supabase!')
+        setCustomerCount(count || 0)
       }
+
+      setLoading(false)
     }
 
     loadCustomers()
@@ -25,51 +549,33 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1>Dashboard</h1>
-      <p>{message}</p>
+      <h1>Welcome, {user?.full_name || user?.username}</h1>
+      <p>Cashier Dashboard</p>
+
+      {error && <p className="dashboard-error">{error}</p>}
 
       <div className="users-summary">
         <div className="users-summary-card">
           <span>Total Customers</span>
-          <strong>{customers.length}</strong>
+          <strong>{loading ? '...' : customerCount}</strong>
         </div>
       </div>
 
-      <div className="users-table-card">
-        <div className="users-table-heading">
-          <h2>Customers</h2>
-        </div>
-
-        <div className="users-table-wrapper">
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Customer ID</th>
-                <th>First Name</th>
-                <th>Last Name</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {customers.map((customer) => (
-                <tr key={customer.customer_id}>
-                  <td>{customer.customer_id}</td>
-                  <td>{customer.first_name}</td>
-                  <td>{customer.last_name}</td>
-                  <td>{customer.status}</td>
-                </tr>
-              ))}
-
-              {customers.length === 0 && (
-                <tr>
-                  <td colSpan="4">No customers to display.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Link to="/customers">View Customers</Link>
     </div>
   )
+}
+
+export default function Dashboard() {
+  const { user, loading } = useAuth()
+
+  if (loading || !user) {
+    return <p>Loading dashboard...</p>
+  }
+
+  if (user.role === 'Administrator') {
+    return <AdminDashboard user={user} />
+  }
+
+  return <CashierDashboard user={user} />
 }
