@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard'
 import CreateStaff from './pages/CreateStaff'
 import AppraiserDashboard from './pages/AppraiserDashboard'
 import NewAppraisal from './pages/NewAppraisal'
+import Auctions from './pages/Auctions'
+import Reports from './pages/Reports'
 
 
 function Placeholder({ title }) {
@@ -40,13 +42,7 @@ function RolePage({ roles, children }) {
   return children
 }
 
-function AppLayout() {
-  return (
-    <ProtectedRoute>
-      <Layout />
-    </ProtectedRoute>
-  )
-}
+
 
 export default function App() {
   return (
@@ -76,10 +72,19 @@ export default function App() {
           />
 
           <Route
+            path="/users"
+            element={
+              <RolePage roles={['Administrator']}>
+                <Users />
+              </RolePage>
+            }
+          />
+
+          <Route
             path="/auctions"
             element={
               <RolePage roles={['Administrator']}>
-                <Placeholder title="Auctions" />
+                <Auctions />
               </RolePage>
             }
           />
@@ -88,7 +93,7 @@ export default function App() {
             path="/reports"
             element={
               <RolePage roles={['Administrator']}>
-                <Placeholder title="Reports" />
+                <Reports />
               </RolePage>
             }
           />
