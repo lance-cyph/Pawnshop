@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
@@ -24,6 +23,57 @@ function getTodayRange() {
   }
 }
 
+function StatIcon({ type }) {
+  const props = {
+    width: 24,
+    height: 24,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  }
+
+  switch (type) {
+    case 'customers':
+      return (
+        <svg {...props}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      )
+    case 'loans':
+      return (
+        <svg {...props}>
+          <rect x="2" y="6" width="20" height="12" rx="4" />
+          <circle cx="12" cy="12" r="2.5" />
+          <path d="M6 12h.01M18 12h.01" />
+        </svg>
+      )
+    case 'staff':
+      return (
+        <svg {...props}>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      )
+    case 'auction':
+    default:
+      return (
+        <svg {...props}>
+          <path d="m14.5 12.5-8 8a2.11 2.11 0 1 1-3-3l8-8" />
+          <path d="m16 16 6-6" />
+          <path d="m8 8 6-6" />
+          <path d="m9 7 8 8" />
+          <path d="m21 11-8-8" />
+        </svg>
+      )
+  }
+}
+
 function AdminDashboard({ user }) {
   const [stats, setStats] = useState({
     customers: 0,
@@ -43,7 +93,6 @@ function AdminDashboard({ user }) {
     auction: [],
   })
 
-  // ADD THIS STATE
   const [recentReceipts, setRecentReceipts] = useState([])
 
   const [loading, setLoading] = useState(true)
@@ -144,7 +193,6 @@ function AdminDashboard({ user }) {
         ['Active', 'Renewed'].includes(ticket.ticket_status)
       )
 
-      // Use YYYY-MM-DD strings to compare dates accurately.
       const today = new Date()
       const todayString = [
         today.getFullYear(),
@@ -161,23 +209,16 @@ function AdminDashboard({ user }) {
         String(sevenDaysLater.getDate()).padStart(2, '0'),
       ].join('-')
 
-      // Due within the next 7 days, including today.
       const expiringTickets = activeTickets.filter((ticket) =>
         ticket.due_date >= todayString &&
         ticket.due_date <= sevenDaysString
       )
 
-      // Due date has passed, but the ticket is still active.
       const overdueTickets = activeTickets.filter((ticket) =>
         ticket.due_date < todayString &&
         ticket.grace_period_end_date >= todayString
       )
-      const gracePeriodExpiredTickets = activeTickets.filter((ticket) =>
-        ticket.grace_period_end_date &&
-        ticket.grace_period_end_date < todayString
-      )
 
-      // Pawned items already marked For Auction.
       const auctionTickets = tickets.filter((ticket) =>
         ticket.pawned_items?.item_status === 'For Auction'
       )
@@ -187,6 +228,7 @@ function AdminDashboard({ user }) {
         overdue: overdueTickets,
         auction: auctionTickets,
       })
+
       const cashIn = ledger
         .filter((entry) => entry.flow_type === 'Inflow')
         .reduce((total, entry) => total + Number(entry.amount || 0), 0)
@@ -226,27 +268,31 @@ function AdminDashboard({ user }) {
     {
       title: 'Total Customers',
       value: stats.customers.toLocaleString(),
-      icon: '👥',
-      color: '#ede9fe',
+      iconType: 'customers',
+      bg: '#ede9fe',
+      fg: '#7c3aed',
     },
     {
       title: 'Active Loans',
       value: stats.activeLoans.toLocaleString(),
       subtitle: peso(stats.activeLoanAmount),
-      icon: '💰',
-      color: '#dbeafe',
+      iconType: 'loans',
+      bg: '#e0e7ff',
+      fg: '#4f46e5',
     },
     {
       title: 'Active Staff',
       value: stats.activeStaff.toLocaleString(),
-      icon: '👨‍💼',
-      color: '#dcfce7',
+      iconType: 'staff',
+      bg: '#fce7f3',
+      fg: '#db2777',
     },
     {
       title: 'For Auction',
       value: stats.auctionItems.toLocaleString(),
-      icon: '🔨',
-      color: '#ffedd5',
+      iconType: 'auction',
+      bg: '#ffedd5',
+      fg: '#ea580c',
     },
   ]
 
@@ -266,7 +312,22 @@ function AdminDashboard({ user }) {
           onClick={loadDashboard}
           disabled={loading}
         >
-          {loading ? 'Loading...' : '↻ Refresh'}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
+          </svg>
+          <span>{loading ? 'Loading...' : 'Refresh'}</span>
         </button>
       </div>
 
@@ -281,9 +342,9 @@ function AdminDashboard({ user }) {
           <div className="dashboard-card" key={card.title}>
             <div
               className="dashboard-card-icon"
-              style={{ background: card.color }}
+              style={{ background: card.bg, color: card.fg }}
             >
-              {card.icon}
+              <StatIcon type={card.iconType} />
             </div>
 
             <div>
@@ -300,40 +361,35 @@ function AdminDashboard({ user }) {
         ))}
       </div>
 
-    <div className="dashboard-section">
+      <div className="dashboard-section">
         <div className="dashboard-section-heading">
-          <h2>Loan Alerts</h2>
-          <span>Pawn tickets that need attention</span>
+          <div>
+            <h2>Loan Alerts</h2>
+            <span>Pawn tickets that need attention</span>
+          </div>
         </div>
 
         <div className="dashboard-grid dashboard-alert-grid">
-
-          {/* EXPIRING SOON */}
           <div className="dashboard-alert warning">
             <span>Expiring Within 7 Days</span>
             <strong>{loading ? '...' : loanAlerts.expiring.length}</strong>
           </div>
 
-          {/* OVERDUE */}
           <div className="dashboard-alert danger">
             <span>Overdue Loans</span>
             <strong>{loading ? '...' : loanAlerts.overdue.length}</strong>
           </div>
 
-          {/* FOR AUCTION */}
           <div className="dashboard-alert">
             <span>Items For Auction</span>
             <strong>{loading ? '...' : loanAlerts.auction.length}</strong>
           </div>
-
         </div>
 
         {loading ? (
           <p className="dashboard-message">Loading loan alerts...</p>
         ) : (
           <div className="loan-alert-details">
-
-            {/* EXPIRING TICKETS */}
             <div className="loan-alert-group">
               <h3>Expiring Soon</h3>
 
@@ -364,7 +420,6 @@ function AdminDashboard({ user }) {
               )}
             </div>
 
-            {/* OVERDUE TICKETS */}
             <div className="loan-alert-group">
               <h3>Overdue Loans</h3>
 
@@ -395,7 +450,6 @@ function AdminDashboard({ user }) {
               )}
             </div>
 
-            {/* AUCTION TICKETS */}
             <div className="loan-alert-group">
               <h3>Items For Auction</h3>
 
@@ -427,15 +481,16 @@ function AdminDashboard({ user }) {
                 })
               )}
             </div>
-
           </div>
         )}
       </div>
 
       <div className="dashboard-section">
         <div className="dashboard-section-heading">
-          <h2>Cash Flow Today</h2>
-          <span>Based on today's ledger records</span>
+          <div>
+            <h2>Cash Flow Today</h2>
+            <span>Based on today's ledger records</span>
+          </div>
         </div>
 
         <div className="dashboard-grid">
@@ -527,7 +582,6 @@ function CashierDashboard({ user }) {
   const [customerCount, setCustomerCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [recentReceipts, setRecentReceipts] = useState([])
 
   useEffect(() => {
     async function loadCustomers() {
@@ -548,9 +602,13 @@ function CashierDashboard({ user }) {
   }, [])
 
   return (
-    <div>
-      <h1>Welcome, {user?.full_name || user?.username}</h1>
-      <p>Cashier Dashboard</p>
+    <div className="admin-dashboard">
+      <div className="dashboard-heading">
+        <div>
+          <h1>Welcome, {user?.full_name || user?.username}</h1>
+          <p>Cashier Dashboard</p>
+        </div>
+      </div>
 
       {error && <p className="dashboard-error">{error}</p>}
 
@@ -561,7 +619,9 @@ function CashierDashboard({ user }) {
         </div>
       </div>
 
-      <Link to="/customers">View Customers</Link>
+      <div className="dashboard-shortcuts">
+        <Link to="/customers">View Customers</Link>
+      </div>
     </div>
   )
 }
