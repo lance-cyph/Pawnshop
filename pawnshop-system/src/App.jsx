@@ -1,4 +1,3 @@
-
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -11,16 +10,9 @@ import AppraiserDashboard from './pages/AppraiserDashboard'
 import NewAppraisal from './pages/NewAppraisal'
 import Auctions from './pages/Auctions'
 import Reports from './pages/Reports'
-
-
-function Placeholder({ title }) {
-  return (
-    <div>
-      <h1>{title}</h1>
-      <p>This page is not implemented yet.</p>
-    </div>
-  )
-}
+import Customers from './pages/Customers'
+import NewTicket from './pages/NewTicket'
+import RedeemRenew from './pages/RedeemRenew'
 
 function HomeRedirect() {
   const { user } = useAuth()
@@ -41,8 +33,6 @@ function RolePage({ roles, children }) {
 
   return children
 }
-
-
 
 export default function App() {
   return (
@@ -102,7 +92,7 @@ export default function App() {
             path="/customers"
             element={
               <RolePage roles={['Cashier']}>
-                <Placeholder title="Customers" />
+                <Customers />
               </RolePage>
             }
           />
@@ -111,7 +101,7 @@ export default function App() {
             path="/new-ticket"
             element={
               <RolePage roles={['Cashier']}>
-                <Placeholder title="New Ticket" />
+                <NewTicket />
               </RolePage>
             }
           />
@@ -120,7 +110,7 @@ export default function App() {
             path="/redeem-renew"
             element={
               <RolePage roles={['Cashier']}>
-                <Placeholder title="Redeem / Renew" />
+                <RedeemRenew />
               </RolePage>
             }
           />
@@ -133,7 +123,7 @@ export default function App() {
               </RolePage>
             }
           />
-          
+
           <Route
             path="/new-appraisal"
             element={

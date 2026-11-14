@@ -1778,3 +1778,84 @@
     background: white !important;
   }
 }
+
+/* ================================
+   EXPORT DROPDOWN MENU
+================================ */
+.export-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.reports-print-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 245px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #ede9fe;
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.export-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  transition: background 0.18s ease;
+}
+
+.export-dropdown-item:hover {
+  background: #f5f3ff;
+}
+
+.export-dropdown-item strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.export-dropdown-item small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-body);
+}
+
+.export-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.export-badge.pdf {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.export-badge.excel {
+  background: #dcfce7;
+  color: #16a34a;
+}

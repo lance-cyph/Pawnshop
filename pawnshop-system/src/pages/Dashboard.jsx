@@ -580,25 +580,81 @@ function AdminDashboard({ user }) {
 
 function CashierDashboard({ user }) {
   const [customerCount, setCustomerCount] = useState(0)
+  const [loanAlerts, setLoanAlerts] = useState({
+    expiring: [],
+    overdue: [],
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    async function loadCustomers() {
-      const { count, error } = await supabase
-        .from('customers')
-        .select('customer_id', { count: 'exact', head: true })
+    async function loadCashierData() {
+      setLoading(true)
+      try {
+        const { count: custCount, error: custErr } = await supabase
+          .from('customers')
+          .select('customer_id', { count: 'exact', head: true })
 
-      if (error) {
-        setError(error.message)
-      } else {
-        setCustomerCount(count || 0)
+        if (custErr) throw custErr;
+        setCustomerCount(custCount || 0)
+
+        const { data: tickets, error: tickErr } = await supabase
+          .from('pawn_tickets')
+          .select(`
+            ticket_id,
+            transaction_number,
+            loan_amount,
+            due_date,
+            grace_period_end_date,
+            ticket_status,
+            customers (
+              first_name,
+              last_name
+            )
+          `)
+          .in('ticket_status', ['Active', 'Renewed'])
+
+        if (tickErr) throw tickErr;
+
+        const activeTickets = tickets || [];
+        const today = new Date()
+        const todayString = [
+          today.getFullYear(),
+          String(today.getMonth() + 1).padStart(2, '0'),
+          String(today.getDate()).padStart(2, '0'),
+        ].join('-')
+
+        const sevenDaysLater = new Date(today)
+        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
+
+        const sevenDaysString = [
+          sevenDaysLater.getFullYear(),
+          String(sevenDaysLater.getMonth() + 1).padStart(2, '0'),
+          String(sevenDaysLater.getDate()).padStart(2, '0'),
+        ].join('-')
+
+        const expiringTickets = activeTickets.filter((ticket) =>
+          ticket.due_date >= todayString &&
+          ticket.due_date <= sevenDaysString
+        )
+
+        const overdueTickets = activeTickets.filter((ticket) =>
+          ticket.due_date < todayString &&
+          ticket.grace_period_end_date >= todayString
+        )
+
+        setLoanAlerts({
+          expiring: expiringTickets,
+          overdue: overdueTickets
+        })
+      } catch (err) {
+        setError(err.message || 'Unable to load dashboard information.')
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
-    loadCustomers()
+    loadCashierData()
   }, [])
 
   return (
@@ -612,15 +668,117 @@ function CashierDashboard({ user }) {
 
       {error && <p className="dashboard-error">{error}</p>}
 
-      <div className="users-summary">
-        <div className="users-summary-card">
-          <span>Total Customers</span>
-          <strong>{loading ? '...' : customerCount}</strong>
+      <div className="dashboard-grid">
+        <div className="dashboard-card">
+          <div
+            className="dashboard-card-icon"
+            style={{ background: '#ede9fe', color: '#7c3aed' }}
+          >
+            <StatIcon type="customers" />
+          </div>
+          <div>
+            <span>Total Customers</span>
+            <strong>{loading ? '...' : customerCount}</strong>
+          </div>
         </div>
       </div>
 
-      <div className="dashboard-shortcuts">
-        <Link to="/customers">View Customers</Link>
+      <div className="dashboard-section">
+        <div className="dashboard-section-heading">
+          <div>
+            <h2>Loan Alerts</h2>
+            <span>Pawn tickets that need attention today</span>
+          </div>
+        </div>
+
+        <div className="dashboard-grid dashboard-alert-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+          <div className="dashboard-alert warning">
+            <span>Expiring Within 7 Days</span>
+            <strong>{loading ? '...' : loanAlerts.expiring.length}</strong>
+          </div>
+
+          <div className="dashboard-alert danger">
+            <span>Overdue Loans</span>
+            <strong>{loading ? '...' : loanAlerts.overdue.length}</strong>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="dashboard-message">Loading loan alerts...</p>
+        ) : (
+          <div className="loan-alert-details" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <div className="loan-alert-group">
+              <h3>Expiring Soon</h3>
+
+              {loanAlerts.expiring.length === 0 ? (
+                <p>No tickets expiring within 7 days.</p>
+              ) : (
+                loanAlerts.expiring.map((ticket) => {
+                  const customer = ticket.customers
+
+                  return (
+                    <div className="loan-alert-item" key={ticket.ticket_id}>
+                      <div>
+                        <strong>{ticket.transaction_number}</strong>
+                        <span>
+                          {customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown Customer'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <strong>{peso(ticket.loan_amount)}</strong>
+                        <span>Due: {ticket.due_date}</span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            <div className="loan-alert-group">
+              <h3>Overdue Loans</h3>
+
+              {loanAlerts.overdue.length === 0 ? (
+                <p>No overdue active loans.</p>
+              ) : (
+                loanAlerts.overdue.map((ticket) => {
+                  const customer = ticket.customers
+
+                  return (
+                    <div className="loan-alert-item" key={ticket.ticket_id}>
+                      <div>
+                        <strong>{ticket.transaction_number}</strong>
+                        <span>
+                          {customer
+                            ? `${customer.first_name} ${customer.last_name}`
+                            : 'Unknown Customer'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <strong>{peso(ticket.loan_amount)}</strong>
+                        <span>Due: {ticket.due_date}</span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="dashboard-section">
+        <div className="dashboard-section-heading">
+          <h2>Quick Shortcuts</h2>
+        </div>
+        <div className="dashboard-shortcuts">
+          <Link to="/customers">Register Customer</Link>
+          <Link to="/new-ticket">New Ticket</Link>
+          <Link to="/redeem-renew">Redeem / Renew</Link>
+        </div>
       </div>
     </div>
   )

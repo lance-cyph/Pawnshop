@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
 function getToday() {
@@ -43,6 +42,7 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(getMonthStart())
   const [endDate, setEndDate] = useState(getToday())
   const [selectedPreset, setSelectedPreset] = useState('This Month')
+  const [exportOpen, setExportOpen] = useState(false)
 
   const [cashFlows, setCashFlows] = useState([])
   const [tickets, setTickets] = useState([])
@@ -52,9 +52,25 @@ export default function Reports() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const exportMenuRef = useRef(null)
+
   useEffect(() => {
     loadReports()
   }, [startDate, endDate])
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(event.target)
+      ) {
+        setExportOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   function applyPreset(preset) {
     const today = getToday()
@@ -75,7 +91,6 @@ export default function Reports() {
       setStartDate('')
       setEndDate('')
     }
-    // Custom Range keeps the dates selected by the user.
   }
 
   function handleStartDateChange(value) {
@@ -88,8 +103,11 @@ export default function Reports() {
     setSelectedPreset('Custom Range')
   }
 
-  function handlePrint() {
-    window.print()
+  function handleExportPDF() {
+    setExportOpen(false)
+    setTimeout(() => {
+      window.print()
+    }, 100)
   }
 
   async function loadReports() {
@@ -102,7 +120,6 @@ export default function Reports() {
     setLoading(true)
     setError('')
 
-    // Convert selected dates into local-day timestamp boundaries.
     const startISO = startDate
       ? new Date(`${startDate}T00:00:00`).toISOString()
       : null
@@ -111,7 +128,6 @@ export default function Reports() {
       ? new Date(`${endDate}T23:59:59.999`).toISOString()
       : null
 
-    // Apply date filters only when a date is selected.
     function applyDateFilter(query, column) {
       if (startISO) {
         query = query.gte(column, startISO)
@@ -229,6 +245,56 @@ export default function Reports() {
     ? 'All Time'
     : `${startDate || 'Beginning'} to ${endDate || 'Present'}`
 
+  function handleExportExcel() {
+    setExportOpen(false)
+
+    const rows = [
+      ['Pawnshop Management System - Report'],
+      ['Report Period', reportPeriod],
+      ['Generated', new Date().toLocaleString('en-PH')],
+      [],
+      ['FINANCIAL SUMMARY', 'Amount (PHP)'],
+      ['Total Inflows', totalInflow.toFixed(2)],
+      ['Total Outflows', totalOutflow.toFixed(2)],
+      ['Net Cash Flow', netCashFlow.toFixed(2)],
+      ['Auction Revenue', auctionRevenue.toFixed(2)],
+      [],
+      ['PAWN TICKET REPORT', 'Count'],
+      ...ticketStatuses.map((status) => [status, countStatus(tickets, status)]),
+      [],
+      ['AUCTION REPORT', 'Value'],
+      ['Items Sold', soldAuctions],
+      ['Returned to Inventory', returnedAuctions],
+      ['Auction Revenue (PHP)', auctionRevenue.toFixed(2)],
+      [],
+      ['INVENTORY REPORT', 'Count'],
+      ...itemStatuses.map((status) => [
+        status,
+        items.filter((item) => item.item_status === status).length,
+      ]),
+    ]
+
+    const csvContent = rows
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\n')
+
+    const blob = new Blob(['\uFEFF' + csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Pawnshop-Report-${getToday()}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="reports-page">
       <div className="reports-header">
@@ -238,14 +304,73 @@ export default function Reports() {
         </div>
 
         <div className="reports-header-actions">
-          <button
-            type="button"
-            className="reports-print-button"
-            onClick={handlePrint}
-            disabled={loading}
-          >
-            Print Report
-          </button>
+          <div className="export-dropdown" ref={exportMenuRef}>
+            <button
+              type="button"
+              className="reports-print-button"
+              onClick={() => setExportOpen((prev) => !prev)}
+              disabled={loading}
+              aria-expanded={exportOpen}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Export</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {exportOpen && (
+              <div className="export-dropdown-menu" role="menu">
+                <button
+                  type="button"
+                  className="export-dropdown-item"
+                  onClick={handleExportPDF}
+                  role="menuitem"
+                >
+                  <span className="export-badge pdf">PDF</span>
+                  <div>
+                    <strong>Export as PDF</strong>
+                    <small>Save or print formatted report</small>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="export-dropdown-item"
+                  onClick={handleExportExcel}
+                  role="menuitem"
+                >
+                  <span className="export-badge excel">XLS</span>
+                  <div>
+                    <strong>Export as Excel (CSV)</strong>
+                    <small>Download spreadsheet data</small>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
