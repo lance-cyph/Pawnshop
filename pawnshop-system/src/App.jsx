@@ -13,6 +13,7 @@ import Reports from './pages/Reports'
 import Customers from './pages/Customers'
 import NewTicket from './pages/NewTicket'
 import RedeemRenew from './pages/RedeemRenew'
+import Forfeitures from './pages/Forfeitures'
 
 function HomeRedirect() {
   const { user } = useAuth()
@@ -75,6 +76,15 @@ export default function App() {
             element={
               <RolePage roles={['Administrator']}>
                 <Auctions />
+              </RolePage>
+            }
+          />
+          
+          <Route
+            path="/forfeitures"
+            element={
+              <RolePage roles={['Administrator']}>
+                <Forfeitures />
               </RolePage>
             }
           />

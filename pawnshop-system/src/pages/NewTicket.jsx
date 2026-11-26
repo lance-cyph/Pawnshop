@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { useAuth } from '../context/AuthContext'
+
 
 function peso(value) {
   return '₱' + Number(value || 0).toLocaleString('en-PH', {
@@ -27,7 +27,7 @@ function getToday() {
 }
 
 export default function NewTicket() {
-  const { user } = useAuth()
+  
 
   const [customers, setCustomers] = useState([])
   const [availableItems, setAvailableItems] = useState([])
@@ -143,34 +143,24 @@ export default function NewTicket() {
       const randomDigits = String(Math.floor(1000 + Math.random() * 9000))
       const transactionNumber = `PT-${year}-${randomDigits}`
 
-      const { data: ticketData, error: ticketError } = await supabase
-        .from('pawn_tickets')
-        .insert({
-          transaction_number: transactionNumber,
-          customer_id: selectedCustomerId,
-          item_id: selectedItemId,
-          cashier_id: user.user_id,
-          loan_amount: numericLoan,
-          monthly_interest_rate: monthlyRate,
-          loan_date: loanDate,
-          due_date: dueDate,
-          grace_period_end_date: gracePeriodEndDate,
-          ticket_status: 'Active',
-        })
-        .select()
-        .single()
+      
+      const { data: ticketData, error: ticketError } = await supabase.rpc(
+        'create_pawn_ticket',
+        {
+          p_transaction_number: transactionNumber,
+          p_customer_id: selectedCustomerId,
+          p_item_id: selectedItemId,
+          p_loan_amount: numericLoan,
+          p_monthly_interest_rate: monthlyRate,
+          p_loan_date: loanDate,
+          p_due_date: dueDate,
+          p_grace_period_end_date: gracePeriodEndDate,
+        }
+      )
 
       if (ticketError) throw new Error(ticketError.message)
 
-      // Record cash outflow for loan release
-      await supabase.from('cash_flow_ledger').insert({
-        recorded_by_user_id: user.user_id,
-        ticket_id: ticketData.ticket_id,
-        flow_type: 'Outflow',
-        category: 'Loan Release',
-        amount: numericLoan,
-        description: `Loan release for ${transactionNumber}`,
-      })
+
 
       setGeneratedTicket({
         ...ticketData,

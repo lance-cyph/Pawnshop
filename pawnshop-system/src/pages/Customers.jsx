@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 
 export default function Customers() {
   const [customers, setCustomers] = useState([])
+  
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -32,7 +33,7 @@ export default function Customers() {
     loadCustomers()
   }, [])
 
-  async function loadCustomers() {
+ async function loadCustomers() {
     setLoading(true)
     setError('')
 
@@ -43,32 +44,93 @@ export default function Customers() {
 
     if (fetchError) {
       setError(fetchError.message)
-    } else {
-      setCustomers(data || [])
+      setLoading(false)
+      return
     }
 
+    const customerList = data || []
+    setCustomers(customerList)
+
+    
     setLoading(false)
   }
 
-  async function uploadIdImage(file) {
-    const ext = file.name.split('.').pop()
-    const fileName = `customer-ids/${Date.now()}-${Math.random()
+  async function handleViewId(customer) {
+    setError('')
+
+    // Open a blank tab immediately to avoid popup blocking
+    const newTab = window.open('', '_blank')
+
+    if (!newTab) {
+      setError('Please allow pop-ups to view the customer ID.')
+      return
+    }
+
+    try {
+      const imageValue = customer.id_image_url
+
+      if (!imageValue) {
+        throw new Error('No ID image is saved for this customer.')
+      }
+
+      let bucket = 'customer-ids'
+      let filePath = imageValue
+
+      // Support older records saved in the item-images bucket
+      const legacyMarker = '/storage/v1/object/public/item-images/'
+
+      if (imageValue.includes(legacyMarker)) {
+        bucket = 'item-images'
+        filePath = imageValue.split(legacyMarker)[1]
+      }
+
+      // Generate a fresh signed URL valid for one hour
+      const { data, error: signedError } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 3600)
+
+      if (signedError) {
+        throw new Error(signedError.message)
+      }
+
+      newTab.location.href = data.signedUrl
+    } catch (err) {
+      newTab.close()
+      setError(`Unable to open customer ID: ${err.message}`)
+    }
+  }
+
+ async function uploadIdImage(file) {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    const maxSize = 5 * 1024 * 1024
+
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Only JPG, PNG, and WEBP images are allowed.')
+    }
+
+    if (file.size > maxSize) {
+      throw new Error('ID image must not exceed 5 MB.')
+    }
+
+    const extension = file.type.split('/')[1].replace('jpeg', 'jpg')
+
+    const fileName = `${Date.now()}-${Math.random()
       .toString(36)
-      .slice(2, 8)}.${ext}`
+      .slice(2, 8)}.${extension}`
 
     const { error: uploadError } = await supabase.storage
-      .from('item-images')
-      .upload(fileName, file)
+      .from('customer-ids')
+      .upload(fileName, file, {
+        contentType: file.type,
+        upsert: false,
+      })
 
     if (uploadError) {
       throw new Error(`ID Upload failed: ${uploadError.message}`)
     }
 
-    const { data } = supabase.storage
-      .from('item-images')
-      .getPublicUrl(fileName)
-
-    return data.publicUrl
+    // Save the private storage path, NOT a public URL
+    return fileName
   }
 
   async function handleRegister(e) {
@@ -84,7 +146,7 @@ export default function Customers() {
     setSaving(true)
 
     try {
-      const publicUrl = await uploadIdImage(idFile)
+      const imagePath = await uploadIdImage(idFile)
 
       const { error: insertError } = await supabase.from('customers').insert({
         first_name: firstName.trim(),
@@ -92,7 +154,7 @@ export default function Customers() {
         contact_number: contactNumber.trim(),
         email: email.trim() || null,
         address: address.trim(),
-        id_image_url: publicUrl,
+        id_image_url: imagePath,
         is_active: true,
       })
 
@@ -287,15 +349,13 @@ export default function Customers() {
                     <td>{customer.address}</td>
                     <td>
                       {customer.id_image_url ? (
-                        <a
-                          href={customer.id_image_url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
                           className="users-role"
-                          style={{ textDecoration: 'none' }}
+                          onClick={() => handleViewId(customer)}
                         >
                           View ID
-                        </a>
+                        </button>
                       ) : (
                         '—'
                       )}

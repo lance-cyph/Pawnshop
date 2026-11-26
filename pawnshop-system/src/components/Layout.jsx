@@ -14,6 +14,13 @@ function NavIcon({ name }) {
   }
 
   switch (name) {
+    case 'Forfeitures':
+      return (
+        <svg {...props}>
+          <path d="M12 3 4 7v5c0 5 3.5 8 8 9 4.5-1 8-4 8-9V7Z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      )
     case 'Dashboard':
       return (
         <svg {...props}>
@@ -100,6 +107,7 @@ const navigation = {
   Administrator: [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'Auctions', path: '/auctions' },
+    { label: 'Forfeitures', path: '/forfeitures' },
     { label: 'Reports', path: '/reports' },
     { label: 'Users', path: '/users' },
     { label: 'Create Staff Account', path: '/create-staff' },
@@ -211,7 +219,7 @@ export default function Layout() {
       <main className="main-content">
         <header className="topbar">
           <span>Welcome, {displayName}</span>
-          <span className="topbar-pill">✦ {user?.role} Portal</span>
+          <span className="topbar-pill">{user?.role} Portal</span>
         </header>
 
         <section className="page-content">

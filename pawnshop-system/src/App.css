@@ -4,26 +4,25 @@
 :root {
   --font-family-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Vibrant Violet Palette (Inventor.io inspired) */
-  --grad-primary: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-  --grad-primary-hover: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
-  --grad-sidebar: linear-gradient(180deg, #6d28d9 0%, #5b21b6 60%, #4c1d95 100%);
+  /* Pawnshop Purple Theme */
+  --grad-primary: linear-gradient(135deg, #6223C3 0%, #281F47 100%);
+  --grad-primary-hover: linear-gradient(135deg, #7029D9 0%, #38265F 100%);
+  --grad-sidebar: linear-gradient(180deg, #281F47 0%, #6223C3 100%);
 
-  /* Soft Lavender & Crisp White Neutrals */
-  --bg-app: #f6f5fb;
-  --bg-card: #ffffff;
-  --text-dark: #1e1b4b;
+  /* Background and Text */
+  --bg-app: #F6F5FA;
+  --bg-card: #FFFFFF;
+  --text-dark: #211936;
   --text-body: #64748b;
   --text-muted: #94a3b8;
-  --border-light: #ede9fe;
+  --border-light: #EAE5F2;
 
-  /* Cute Soft Shadows */
-  --shadow-sm: 0 2px 8px rgba(109, 40, 217, 0.04);
-  --shadow-md: 0 8px 24px -4px rgba(109, 40, 217, 0.07), 0 2px 6px -1px rgba(109, 40, 217, 0.04);
-  --shadow-lg: 0 16px 36px -6px rgba(109, 40, 217, 0.12), 0 6px 16px -4px rgba(109, 40, 217, 0.05);
-  --shadow-primary: 0 8px 20px -4px rgba(124, 58, 237, 0.42);
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(40, 31, 71, 0.04);
+  --shadow-md: 0 8px 24px -4px rgba(40, 31, 71, 0.08);
+  --shadow-lg: 0 16px 36px -6px rgba(40, 31, 71, 0.12);
+  --shadow-primary: 0 8px 20px -4px rgba(98, 35, 195, 0.35);
 }
-
 /* ================================
    LOGIN PAGE
 ================================ */
@@ -73,7 +72,7 @@
   width: 100%;
   padding: 13px 16px;
   border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
+  border-radius: 10px;
   font-size: 14px;
   background: #faf9fe;
   color: var(--text-dark);
@@ -224,12 +223,11 @@
 }
 
 .sidebar-link.active {
-  background: #3b0764;
+  background: rgba(255, 255, 255, 0.20);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 6px 16px rgba(29, 7, 66, 0.35);
+  box-shadow: none;
 }
-
 .sidebar-link.active .sidebar-link-icon {
   opacity: 1;
   color: #c4b5fd;
@@ -602,7 +600,7 @@
   gap: 16px;
   padding: 22px;
   border: 1px solid var(--border-light);
-  border-radius: 22px;
+  border-radius: 12px;
   background: var(--bg-card);
   box-shadow: var(--shadow-md);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -620,7 +618,11 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border-radius: 18px;
+  border-radius: 12px;
+
+  /* Purple Gradient */
+  background: linear-gradient(135deg, #281F47 0%, #6223C3 100%);
+  color: #FFFFFF;
 }
 
 .dashboard-card span,
@@ -1858,4 +1860,91 @@
 .export-badge.excel {
   background: #dcfce7;
   color: #16a34a;
+}
+
+/* Loan Alert Icon */
+.loan-alert-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #281F47 0%, #6223C3 100%);
+  color: #FFFFFF;
+}
+
+.loan-alert-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: #FFFFFF;
+}
+
+/* Loan Alert Text */
+.dashboard-alert > span {
+  color: #64748B;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+/* Overdue Badge */
+.overdue-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #FEE2E2;
+  color: #DC2626;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+
+/* Password input container */
+.login-card .password-input-wrapper {
+  position: relative !important;
+  width: 100%;
+  display: block;
+}
+
+/* Password textbox */
+.login-card .password-input-wrapper input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 50px !important;
+}
+
+/* Eye button inside textbox */
+.login-card .password-input-wrapper button.toggle-password {
+  position: absolute !important;
+  top: 50% !important;
+  right: 10px !important;
+  transform: translateY(-50%) !important;
+
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #333 !important;
+
+  cursor: pointer;
+  font-size: 17px;
+  z-index: 2;
+}
+
+.login-card .password-input-wrapper button.toggle-password:hover {
+  background: transparent !important;
+  box-shadow: none !important;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { useAuth } from '../context/AuthContext'
+
 
 function peso(value) {
   return '₱' + Number(value || 0).toLocaleString('en-PH', {
@@ -19,7 +19,7 @@ function addDays(dateStr, days) {
 }
 
 export default function RedeemRenew() {
-  const { user } = useAuth()
+ 
 
   const [tickets, setTickets] = useState([])
   const [search, setSearch] = useState('')
@@ -89,7 +89,9 @@ export default function RedeemRenew() {
 
   const principal = Number(activeTicket?.loan_amount || 0)
   const rate = Number(activeTicket?.monthly_interest_rate || 0)
-  const interestDue = principal * (rate / 100)
+  const interestDue = Number(
+    (principal * (rate / 100)).toFixed(2)
+  )
   const penaltyDue = Number(penaltyAmount || 0)
 
   const totalDue =
@@ -107,7 +109,8 @@ export default function RedeemRenew() {
     ? addDays(extendedDueDate, graceDays)
     : ''
 
-  async function handleConfirmTransaction(e) {
+  
+async function handleConfirmTransaction(e) {
     e.preventDefault()
     if (!activeTicket) return
 
@@ -116,85 +119,43 @@ export default function RedeemRenew() {
     setSuccess('')
 
     try {
-      const randomDigits = String(Math.floor(1000 + Math.random() * 9000))
+      const randomDigits = String(
+        Math.floor(1000 + Math.random() * 9000)
+      )
+
       const receiptNumber = `OR-${new Date().getFullYear()}-${randomDigits}`
 
-      const isRedemption = actionType === 'Redemption'
-      const principalPaid = isRedemption ? principal : 0
-
-      // 1. Create Official Receipt
-      const { data: receiptData, error: receiptError } = await supabase
-        .from('receipts')
-        .insert({
-          receipt_number: receiptNumber,
-          ticket_id: activeTicket.ticket_id,
-          cashier_id: user.user_id,
-          transaction_type: actionType,
-          principal_paid: principalPaid,
-          interest_paid: interestDue,
-          penalty_paid: penaltyDue,
-          total_amount_due: totalDue,
-          amount_paid: totalDue,
-          previous_due_date: activeTicket.due_date,
-          new_due_date: isRedemption ? null : extendedDueDate,
+      const { data: receiptData, error: transactionError } =
+        await supabase.rpc('process_pawn_transaction', {
+          p_receipt_number: receiptNumber,
+          p_ticket_id: activeTicket.ticket_id,
+          p_transaction_type: actionType,
+          p_penalty_paid: Number(penaltyAmount),
         })
-        .select()
-        .single()
 
-      if (receiptError) throw new Error(receiptError.message)
-
-      // 2. Update Pawn Ticket status / dates
-      const ticketUpdates = isRedemption
-        ? { ticket_status: 'Redeemed' }
-        : {
-            ticket_status: 'Renewed',
-            due_date: extendedDueDate,
-            grace_period_end_date: extendedGraceDate,
-          }
-
-      const { error: ticketError } = await supabase
-        .from('pawn_tickets')
-        .update(ticketUpdates)
-        .eq('ticket_id', activeTicket.ticket_id)
-
-      if (ticketError) throw new Error(ticketError.message)
-
-      // 3. If redeemed, release pledged item
-      if (isRedemption && activeTicket.pawned_items?.item_id) {
-        const { error: itemError } = await supabase
-          .from('pawned_items')
-          .update({ item_status: 'Redeemed' })
-          .eq('item_id', activeTicket.pawned_items.item_id)
-
-        if (itemError) throw new Error(itemError.message)
+      if (transactionError) {
+        throw new Error(transactionError.message)
       }
-
-      // 4. Record cash inflow
-      await supabase.from('cash_flow_ledger').insert({
-        recorded_by_user_id: user.user_id,
-        ticket_id: activeTicket.ticket_id,
-        receipt_id: receiptData.receipt_id,
-        flow_type: 'Inflow',
-        category: actionType,
-        amount: totalDue,
-        description: `${actionType} payment for ${activeTicket.transaction_number}`,
-      })
 
       setGeneratedReceipt({
         ...receiptData,
         ticket: activeTicket,
       })
+
       setSuccess(
         `${actionType} completed. Official Receipt ${receiptNumber} generated.`
       )
+
       setActiveTicket(null)
       await loadActiveTickets()
+
     } catch (err) {
       setError(err.message)
     } finally {
       setProcessing(false)
     }
   }
+
 
   const filteredTickets = tickets.filter((t) => {
     const q = search.toLowerCase()

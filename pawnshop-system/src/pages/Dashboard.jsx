@@ -35,6 +35,36 @@ function StatIcon({ type }) {
     strokeLinejoin: 'round',
   }
 
+  if (type === 'clock') {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    )
+  }
+
+  if (type === 'alert') {
+    return (
+      <svg {...props}>
+        <path d="M12 3L2.8 20h18.4L12 3z" />
+        <path d="M12 9v5" />
+        <path d="M12 17h.01" />
+      </svg>
+    )
+  }
+
+  if (type === 'items') {
+    return (
+      <svg {...props}>
+        <path d="M3 7l9-4 9 4-9 4-9-4z" />
+        <path d="M3 7v10l9 4 9-4V7" />
+        <path d="M12 11v10" />
+      </svg>
+    )
+  }
+
+
   switch (type) {
     case 'customers':
       return (
@@ -340,10 +370,7 @@ function AdminDashboard({ user }) {
       <div className="dashboard-grid">
         {cards.map((card) => (
           <div className="dashboard-card" key={card.title}>
-            <div
-              className="dashboard-card-icon"
-              style={{ background: card.bg, color: card.fg }}
-            >
+           <div className="dashboard-card-icon">
               <StatIcon type={card.iconType} />
             </div>
 
@@ -369,22 +396,41 @@ function AdminDashboard({ user }) {
           </div>
         </div>
 
-        <div className="dashboard-grid dashboard-alert-grid">
-          <div className="dashboard-alert warning">
-            <span>Expiring Within 7 Days</span>
-            <strong>{loading ? '...' : loanAlerts.expiring.length}</strong>
-          </div>
+        
+      <div className="dashboard-grid dashboard-alert-grid">
 
-          <div className="dashboard-alert danger">
-            <span>Overdue Loans</span>
-            <strong>{loading ? '...' : loanAlerts.overdue.length}</strong>
+        {/* Expiring Within 7 Days */}
+        <div className="dashboard-alert">
+          <div className="loan-alert-icon">
+            <StatIcon type="clock" />
           </div>
-
-          <div className="dashboard-alert">
-            <span>Items For Auction</span>
-            <strong>{loading ? '...' : loanAlerts.auction.length}</strong>
-          </div>
+          <span>Expiring Within 7 Days</span>
+          <strong>{loading ? '...' : loanAlerts.expiring.length}</strong>
         </div>
+
+        {/* Overdue Loans */}
+        <div className="dashboard-alert">
+          <div className="loan-alert-icon">
+            <StatIcon type="alert" />
+          </div>
+          <span>
+            Overdue Loans
+            <small className="overdue-badge">Overdue</small>
+          </span>
+          <strong>{loading ? '...' : loanAlerts.overdue.length}</strong>
+        </div>
+
+        {/* Items For Auction */}
+        <div className="dashboard-alert">
+          <div className="loan-alert-icon">
+            <StatIcon type="items" />
+          </div>
+          <span>Items For Auction</span>
+          <strong>{loading ? '...' : loanAlerts.auction.length}</strong>
+        </div>
+
+      </div>
+
 
         {loading ? (
           <p className="dashboard-message">Loading loan alerts...</p>
